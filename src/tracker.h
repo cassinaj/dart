@@ -130,6 +130,8 @@ public:
 
     void addPrior(Prior * prior) { _priors.push_back(prior); }
 
+    void setPosePrior(int modelIndex, const PosePrior &priorPose);
+
 private:
 
     inline bool initialized() { return _optimizer != 0 && _estimatedPoses.size() > 0; }
@@ -148,6 +150,8 @@ private:
 
     std::vector<Eigen::MatrixXf *> _dampingMatrices;
     std::vector<Prior *> _priors;
+
+    std::map<int, PosePrior> _posePriors;
 
     // collision stuff
     std::vector<MirroredVector<float4> *> _collisionClouds;

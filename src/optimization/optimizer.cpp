@@ -534,7 +534,8 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
                               std::vector<MirroredVector<float4> *> & collisionClouds,
                               std::vector<MirroredVector<int> *> & intersectionPotentialMatrices,
                               std::vector<Eigen::MatrixXf *> & dampingMatrices,
-                              std::vector<Prior *> & priors) {
+                              std::vector<Prior *> & priors,
+                              std::map<int, PosePrior> & posePriors){
 
     // resize scratch space if there are more models than we've seen before
     const int nModels = models.size();
@@ -610,7 +611,7 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
             _predictionRenderer->raytracePrediction(constModelPtrs,_depthPredictStream);
             _predictionRenderer->cullUnobservable(dObsVertMap,width,height,_depthPredictStream);
         }
-        
+
         errorAndDataAssociationMultiModel(dObsVertMap,dObsNormMap,width,height,nModels,
                                           T_mcs.devicePtr(),T_fms.devicePtr(),
                                           sdfFrames.devicePtr(),sdfs.devicePtr(),
@@ -696,7 +697,35 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
             // add damping matrix
             JTJ += *dampingMatrices[m];
 
-            std::cout << JTJ << std::endl << std::endl << std::endl;
+            // add pose priors
+            auto prior_it = posePriors.find(m);
+            if (prior_it != posePriors.end()){
+                PosePrior& posePrior = prior_it->second;
+                if (posePrior.getLength() != reducedDimensions)
+                {
+                    std::cout << "assert(posePrior.getLength() == reducedDimensions)" << std::endl;
+                    exit(1);
+                }
+                Eigen::VectorXf pose_prior = Eigen::Map<Eigen::VectorXf>(posePrior.getPose(), reducedDimensions);
+                Eigen::VectorXf lambdas = Eigen::Map<Eigen::VectorXf>(posePrior.getWeights(), reducedDimensions);
+
+                // construct pose_estimate vector
+                Eigen::VectorXf pose_estimate(reducedDimensions);
+                Eigen::VectorXf q = Eigen::Map<Eigen::VectorXf>(pose.getReducedArticulation(), pose.getReducedArticulatedDimensions());
+                Eigen::VectorXf camera_6dof = Eigen::Map<Eigen::VectorXf>(se3FromSE3(pose.getTransformCameraToModel()).p, 6);
+                pose_estimate.topRows(camera_6dof.size()) = camera_6dof;
+                pose_estimate.bottomRows(q.size()) = q;
+
+//                std::cout << pose_prior.topRows(6).transpose() << std::endl;
+//                std::cout << pose_estimate.topRows(6).transpose() << std::endl;
+//                std::cout << lambdas.topRows(6).transpose() << std::endl;
+//                std::cout << "-------------------------------------" << std::endl;
+
+                JTJ += lambdas.asDiagonal();
+                eJ += lambdas.cwiseProduct(pose_estimate - pose_prior);
+            }
+
+//            std::cout << JTJ << std::endl << std::endl << std::endl;
 
             for (int i=0; i<reducedDimensions; ++i) {
                 for (int j=i; j<reducedDimensions; ++j) {

@@ -413,7 +413,8 @@ void Tracker::optimizePoses() {
                               _collisionClouds,
                               _intersectionPotentialMatrices,
                               _dampingMatrices,
-                              _priors);
+                              _priors,
+                              _posePriors);
 
 }
 
@@ -423,6 +424,18 @@ void Tracker::setIntersectionPotentialMatrix(const int modelNum, const int * mx)
     _intersectionPotentialMatrices[modelNum] = new MirroredVector<int>(nSdfs*nSdfs);
     memcpy(_intersectionPotentialMatrices[modelNum]->hostPtr(),mx,nSdfs*nSdfs*sizeof(int));
     _intersectionPotentialMatrices[modelNum]->syncHostToDevice();
+}
+
+void Tracker::setPosePrior(int modelIndex, const PosePrior &priorPose)
+{
+    auto it = _posePriors.find(modelIndex);
+    if (it != _posePriors.end()) {
+        it->second = priorPose;
+    }
+    else{
+       _posePriors.insert(std::make_pair(modelIndex, priorPose));
+
+    }
 }
 
 }

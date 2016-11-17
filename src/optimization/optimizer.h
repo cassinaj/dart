@@ -55,7 +55,8 @@ public:
                        std::vector<MirroredVector<float4> *> & collisionClouds,
                        std::vector<MirroredVector<int> *> & intersectionPotentialMatrices,
                        std::vector<Eigen::MatrixXf *> & dampingMatrices,
-                       std::vector<Prior *> & priors);
+                       std::vector<Prior *> & priors,
+                       std::map<int, PosePrior>& posePriors);
 
     const float4 * getDevicePredictedPoints() const { return _predictionRenderer->getDevicePrediction(); }
 

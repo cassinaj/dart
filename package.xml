@@ -1,0 +1,9 @@
+<package>
+  <name>dart</name>
+  <version>0.0.0</version>
+  <description>dart</description>
+  <license>GPL</license>
+  <author>Tanner</author>
+  <maintainer email="jan.issac@lularobotics.com">Jan Issac</maintainer>
+  <buildtool_depend>catkin</buildtool_depend>
+</package>
