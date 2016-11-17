@@ -9,6 +9,7 @@
 #include <vector>
 #include <random>
 #include <png.h>
+#include <sys/stat.h>
 #include <jpeglib.h>
 #include "util/string_format.h"
 
