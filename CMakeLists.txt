@@ -21,6 +21,7 @@ find_package(GLUT REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(DEPTHSENSE)
 find_package(OpenNI2)
+find_package(freenect2) # Kinect 2
 
 # find packages with pkg-config
 find_package(PkgConfig)
@@ -67,6 +68,22 @@ if(PMD_FOUND)
     )
 endif()
 
+# Added Kinect 2 compatibility
+if (freenect2_FOUND)
+	set(depth_source_src
+        ${depth_source_src}
+        ${PROJECT_SOURCE_DIR}/src/depth_sources/k2_depth_source.h
+	)
+	set(dart_src
+        ${dart_src}
+        ${PROJECT_SOURCE_DIR}/src/util/colorize_kinect2_point_cloud.h
+	)
+	set(gpu_specific_src
+        ${gpu_specific_src}
+        ${PROJECT_SOURCE_DIR}/src/util/colorize_kinect2_point_cloud.cu
+	)
+endif()
+
 if(assimp_FOUND)
     link_libraries(${assimp_LIBRARIES})
     include_directories(${assimp_INCLUDE_DIRS})
@@ -93,6 +110,7 @@ catkin_package(
     ${GLEW_INCLUDE_DIRS}
     ${tinyxml_INCLUDE_DIR}
     ${DEPEND_INCLUDES}
+	${freenect2_INCLUDE_DIRS}
   LIBRARIES
     dart
     ${PNG_LIBRARIES}
@@ -102,6 +120,7 @@ catkin_package(
     ${tinyxml_LIBRARIES}
     ${matheval_LIBRARIES}
     ${DEPEND_LIBRARIES}
+	${freenect2_LIBRARY}
 )
 
 
@@ -112,6 +131,7 @@ include_directories(
     ${GLUT_INCLUDE_DIR}
     ${GLEW_INCLUDE_DIRS}
     ${tinyxml_INCLUDE_DIR}
+	${freenect2_INCLUDE_DIRS}
 )
 link_directories(${tinyxml_LIBRARY_DIRS})
 link_libraries(
@@ -121,6 +141,8 @@ link_libraries(
     ${GLEW_LIBRARIES}
     ${tinyxml_LIBRARIES}
     ${matheval_LIBRARIES}
+	${freenect2_LIBRARY}
+	/home/fleeb/kct_driver/libfreenect2/depends/libusb/lib/libusb-1.0.so
 )
 
 # set dart source
@@ -219,6 +241,7 @@ set(cpu_specific_src
 )
 
 set(gpu_specific_src
+	${gpu_specific_src}
     ${PROJECT_SOURCE_DIR}/src/geometry/distance_transforms.cu
     ${PROJECT_SOURCE_DIR}/src/geometry/plane_fitting.cu
 
