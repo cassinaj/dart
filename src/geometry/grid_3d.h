@@ -115,7 +115,7 @@ public:
 
         const int x0 = (int)(pGrid.x - 0.5); const float fx = (pGrid.x - 0.5) - x0;
         const int y0 = (int)(pGrid.y - 0.5); const float fy = (pGrid.y - 0.5) - y0;
-        const int z0 = (int)(pGrid.z - 0.5); const float fz = (pGrid.z - 0.5) - z0;;
+        const int z0 = (int)(pGrid.z - 0.5); const float fz = (pGrid.z - 0.5) - z0;
 
         const int x1 = x0 + 1;
         const int y1 = y0 + 1;
@@ -123,7 +123,9 @@ public:
 
         if ( !(x0 >= 0 && x1 < dim.x && y0 >= 0 && y1 < dim.y && z0 >=0 && z1 < dim.z) ) {
             printf("nope_ (%d)\n",isInBoundsInterp(pGrid));
+            return 0;
         }
+
 
         const float dx00 = lerp( getValue(make_int3(x0,y0,z0)), getValue(make_int3(x1,y0,z0)), fx);
         const float dx01 = lerp( getValue(make_int3(x0,y0,z1)), getValue(make_int3(x1,y0,z1)), fx);
