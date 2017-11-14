@@ -207,6 +207,9 @@ public:
                      float2 range) {
         _depthSource = depthSource;
         float s = depthSource->getScaleToMeters();
+
+        std::cout << "\n\n\nrange " << range.x << "  " << range.y << "  " << s << "\n";
+
         if (depthSource->hasRadialDistortionParams()) {
             float calibrationParams[9];
             calibrationParams[0] = depthSource->getFocalLength().x;

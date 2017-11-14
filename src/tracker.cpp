@@ -275,7 +275,7 @@ bool Tracker::addDepthSource(DepthSource<DepthType,ColorType> * depthSource) {
     }
 
     _depthSource = depthSource;
-    _pcSource = new PointCloudSource<DepthType,ColorType>(depthSource,make_float2(0.1,5));
+    _pcSource = new PointCloudSource<DepthType,ColorType>(depthSource,make_float2(0.1,10)); // settingrange
 
     _optimizer = new Optimizer(depthSource,depthSource->getDepthWidth()/2,depthSource->getDepthHeight()/2);
 
@@ -283,6 +283,7 @@ bool Tracker::addDepthSource(DepthSource<DepthType,ColorType> * depthSource) {
 
 }
 template bool Tracker::addDepthSource<float,uchar3>(DepthSource<float,uchar3> * depthSource);
+template bool Tracker::addDepthSource<float,uchar4>(DepthSource<float,uchar4> * depthSource);
 template bool Tracker::addDepthSource<ushort,uchar3>(DepthSource<ushort,uchar3> * depthSource);
 
 void Tracker::updateModel(const int modelNum,
@@ -329,6 +330,10 @@ void Tracker::stepForward() {
     }
 
     _pcSource->advance();
+
+    //float4 cpoint = *(_pcSource->getHostVertMap() + (_pcSource->getDepthHeight() / 2 * _pcSource->getDepthWidth() + _pcSource->getDepthWidth() / 2));
+    //std::cout << "*********central point " << cpoint.x << " " << cpoint.y << " " << cpoint.z << " " << "\n";
+    //std::cout << "testing";
 
 }
 
