@@ -1,4 +1,6 @@
-#include "optimizer.h"
+# include "optimizer.h"
+
+#include <iomanip>
 
 #include <Eigen/Eigen>
 #include <Eigen/Sparse>
@@ -90,6 +92,7 @@ void Optimizer::init(const int depthWidth, const int depthHeight, const float2 f
     _iterationSummaries.resize(_maxModels);
     for (int i=0; i<_maxModels; ++i) { _iterationSummaries[i].resize(10); }
 
+   std::cout << "max mem size:" << _maxDims + JTJSize(_maxDims) + 1 << std::endl;
    _result = new MirroredVector<float>(_maxDims + JTJSize(_maxDims) + 1);
 
    _JTJimg = new MirroredVector<uchar3>(320*240);
@@ -230,6 +233,8 @@ void Optimizer::computeObsToModContribution(Eigen::VectorXf & eJ, Eigen::MatrixX
     const int dims = pose.getReducedDimensions();
     const int modelNum = model.getModelID();
 
+        cudaMemcpy(_result->hostPtr(),_result->devicePtr(),(dims + JTJSize(dims) + 1)*sizeof(float),cudaMemcpyDeviceToHost);
+        CheckCudaDieOnError();
     if (pose.isReduced()) {
         const LinearPoseReduction * reduction = static_cast<const LinearPoseReduction *>(pose.getReduction());
         if (reduction->isParamMap()) {
@@ -239,6 +244,9 @@ void Optimizer::computeObsToModContribution(Eigen::VectorXf & eJ, Eigen::MatrixX
                                      observation.dVertMap, observation.width, observation.height,
                                      model, opts, _dPts->hostPtr()[modelNum], _lastElements->hostPtr()[modelNum],
                                      _result->devicePtr());
+            CheckCudaDieOnError();
+            cudaMemcpy(_result->hostPtr(),_result->devicePtr(),(dims + JTJSize(dims) + 1)*sizeof(float),cudaMemcpyDeviceToHost);
+            CheckCudaDieOnError();
         } else {
             normEqnsObsToModReduced(pose.getDimensions(),
                                     dims,
@@ -250,6 +258,9 @@ void Optimizer::computeObsToModContribution(Eigen::VectorXf & eJ, Eigen::MatrixX
                                     _dPts->hostPtr()[modelNum],
                                     _lastElements->hostPtr()[modelNum], // TODO
                                     _result->devicePtr());
+            CheckCudaDieOnError();
+            cudaMemcpy(_result->hostPtr(),_result->devicePtr(),(dims + JTJSize(dims) + 1)*sizeof(float),cudaMemcpyDeviceToHost);
+            CheckCudaDieOnError();
         }
     } else {
         normEqnsObsToMod(dims,
@@ -261,11 +272,19 @@ void Optimizer::computeObsToModContribution(Eigen::VectorXf & eJ, Eigen::MatrixX
                          _lastElements->hostPtr()[modelNum], // TODO
                          _result->devicePtr(),
                          0); // TODO
+        CheckCudaDieOnError();
+//        std::cout << "model id:" << modelNum << std::endl;
+//        std::cout << "mem size:" << (dims + JTJSize(dims) + 1) << std::endl;
+
+        cudaMemcpy(_result->hostPtr(),_result->devicePtr(),(dims + JTJSize(dims) + 1)*sizeof(float),cudaMemcpyDeviceToHost);
+        CheckCudaDieOnError();
     }
 
-    cudaMemcpy(_result->hostPtr(),_result->devicePtr(),(dims + JTJSize(dims) + 1)*sizeof(float),cudaMemcpyDeviceToHost);
+//    CheckCudaDieOnError();
+//    cudaMemcpy(_result->hostPtr(),_result->devicePtr(),(dims + JTJSize(dims) + 1)*sizeof(float),cudaMemcpyDeviceToHost);
+//    CheckCudaDieOnError();
     unpack(eJ,JTJ,error,_result->hostPtr(),opts.lambdaObsToMod,dims);
-
+    CheckCudaDieOnError();
 }
 
 void Optimizer::computeModToObsContribution(Eigen::VectorXf & eJ, Eigen::MatrixXf & JTJ, float & error,
@@ -590,6 +609,9 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
     Eigen::SparseMatrix<float> sparseJTJ(sysSize,sysSize);
     Eigen::VectorXf fullJTe(sysSize);
 
+
+    CheckCudaDieOnError();
+
     for (int iteration=0; iteration < opts.numIterations; ++iteration) {
 
         sparseJTJ.setZero();
@@ -611,6 +633,7 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
             _predictionRenderer->raytracePrediction(constModelPtrs,_depthPredictStream);
             _predictionRenderer->cullUnobservable(dObsVertMap,width,height,_depthPredictStream);
         }
+    CheckCudaDieOnError();
 
         errorAndDataAssociationMultiModel(dObsVertMap,dObsNormMap,width,height,nModels,
                                           T_mcs.devicePtr(),T_fms.devicePtr(),
@@ -625,6 +648,7 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
                                           _posInfoStream);
 
 
+    CheckCudaDieOnError();
 //        int sysSize = 3*opts.contactPriors.size();
 //        for (int m=0; m<nModels; ++m) { sysSize += poses[m].getReducedDimensions(); }
 //        Eigen::MatrixXf JTJ = Eigen::MatrixXf::Zero(sysSize,sysSize);
@@ -638,11 +662,14 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
 //            std::cout << _lastElements->hostPtr()[m] << " points associated to model " << m << std::endl;
 //        }
 
+    CheckCudaDieOnError();
         int debugIntersectionOffset = 0;
         if (opts.debugIntersectionErr) {
             initDebugIntersectionError(_dDebugIntersectionError,_maxIntersectionSites);
 //            cudaMemset(_dDebugIntersectionError,0,_maxIntersectionSites*sizeof(float));
         }
+
+    CheckCudaDieOnError();
         for (int m=0; m<nModels; ++m) {
 
             MirroredModel & model = *models[m];
@@ -657,19 +684,22 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
 //            float obsToModErr = 0;
 //            float modToObsErr = 0;
             float intersectionError = 0;
-
+    CheckCudaDieOnError();
             if (opts.lambdaObsToMod > 0) {
                 computeObsToModContribution(eJ,JTJ,_iterationSummaries[m][iteration].errObsToMod,model,pose,opts,observation);
                 _iterationSummaries[m][iteration].nAssociatedPoints = _lastElements->hostPtr()[m];
             }
+    CheckCudaDieOnError();
             if (opts.lambdaModToObs > 0) {
                 computeModToObsContribution(eJ,JTJ,_iterationSummaries[m][iteration].errModToObs,model,pose,T_obsSdfs_camera[m],opts);
             }
+    CheckCudaDieOnError();
             if (opts.lambdaIntersection[m + m*nModels] > 0) {
                 computeSelfIntersectionContribution(eJ,JTJ,intersectionError,model,pose,opts,
                                                     *collisionClouds[m],*intersectionPotentialMatrices[m], nModels,
                                                     debugIntersectionOffset);
             }
+    CheckCudaDieOnError();
             for (int d=0; d<nModels; ++d) {
                 if (d == m) { continue; }
                 if (opts.lambdaIntersection[m + d*nModels] > 0) {
@@ -677,6 +707,7 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
                                                     *collisionClouds[m],nModels,debugIntersectionOffset);
                 }
             }
+    CheckCudaDieOnError();
 
             // TODO: get rid of redundancy
             // make JTJ symmetric
@@ -697,32 +728,39 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
             // add damping matrix
             JTJ += *dampingMatrices[m];
 
-            // add pose priors
+            // add articulation priors
             auto prior_it = posePriors.find(m);
-            if (prior_it != posePriors.end()){
+            int articulation_dimension = pose.getReducedArticulatedDimensions();
+            if (prior_it != posePriors.end() && articulation_dimension > 0){
                 PosePrior& posePrior = prior_it->second;
-                if (posePrior.getLength() != reducedDimensions)
+                if (posePrior.getLength() != articulation_dimension)
                 {
-                    std::cout << "assert(posePrior.getLength() == reducedDimensions)" << std::endl;
+                    std::cout << "assert(posePrior.getLength() == "
+                                 "articulation_dimension" << std::endl;
                     exit(1);
                 }
-                Eigen::VectorXf pose_prior = Eigen::Map<Eigen::VectorXf>(posePrior.getPose(), reducedDimensions);
-                Eigen::VectorXf lambdas = Eigen::Map<Eigen::VectorXf>(posePrior.getWeights(), reducedDimensions);
+                Eigen::VectorXf pose_estimate =
+                        Eigen::VectorXf::Zero(reducedDimensions);
+                Eigen::VectorXf pose_prior =
+                        Eigen::VectorXf::Zero(reducedDimensions);
+                Eigen::VectorXf prior_lambdas =
+                        Eigen::VectorXf::Zero(reducedDimensions);
 
-                // construct pose_estimate vector
-                Eigen::VectorXf pose_estimate(reducedDimensions);
-                Eigen::VectorXf q = Eigen::Map<Eigen::VectorXf>(pose.getReducedArticulation(), pose.getReducedArticulatedDimensions());
-                Eigen::VectorXf camera_6dof = Eigen::Map<Eigen::VectorXf>(se3FromSE3(pose.getTransformCameraToModel()).p, 6);
-                pose_estimate.topRows(camera_6dof.size()) = camera_6dof;
-                pose_estimate.bottomRows(q.size()) = q;
+                pose_prior.bottomRows(articulation_dimension) =
+                        Eigen::Map<Eigen::VectorXf>(
+                            posePrior.getPose(), articulation_dimension);
 
-//                std::cout << pose_prior.topRows(6).transpose() << std::endl;
-//                std::cout << pose_estimate.topRows(6).transpose() << std::endl;
-//                std::cout << lambdas.topRows(6).transpose() << std::endl;
-//                std::cout << "-------------------------------------" << std::endl;
+                prior_lambdas.bottomRows(articulation_dimension) =
+                        Eigen::Map<Eigen::VectorXf>(
+                            posePrior.getWeights(), articulation_dimension);
 
-                JTJ += lambdas.asDiagonal();
-                eJ += lambdas.cwiseProduct(pose_estimate - pose_prior);
+                pose_estimate.bottomRows(articulation_dimension) =
+                        Eigen::Map<Eigen::VectorXf>(
+                            pose.getReducedArticulation(),
+                            articulation_dimension);
+
+                JTJ += prior_lambdas.asDiagonal();
+                eJ += prior_lambdas.cwiseProduct(pose_estimate - pose_prior);
             }
 
 //            std::cout << JTJ << std::endl << std::endl << std::endl;
@@ -761,6 +799,7 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
 
             SE3 dT_mc = SE3Fromse3(se3(paramUpdate(modelOffsets[m] + 0),paramUpdate(modelOffsets[m] + 1),paramUpdate(modelOffsets[m] + 2),
                                        paramUpdate(modelOffsets[m] + 3),paramUpdate(modelOffsets[m] + 4),paramUpdate(modelOffsets[m] + 5)));
+
             SE3 new_T_mc = dT_mc*T_mc;
 
             for (int i=0; i<pose.getReducedArticulatedDimensions(); ++i) {
@@ -774,6 +813,7 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
             pose.setTransformCameraToModel(new_T_mc);
             pose.projectReducedToFull();
             model.setPose(pose);
+
         }
 
         for (int p=0; p<priors.size(); ++p) {
@@ -781,6 +821,8 @@ void Optimizer::optimizePoses(std::vector<MirroredModel *> & models,
         }
 
     }
+
+    CheckCudaDieOnError();
 
     if (opts.debugJTJ) {
 
