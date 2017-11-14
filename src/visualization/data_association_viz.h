@@ -19,6 +19,12 @@ void colorDataAssociationMultiModel(uchar3 * coloredAssociation,
                                     const int height,
                                     const uchar3 unassociatedColor = make_uchar3(0,0,0));
 
+void getIndicesFromDataAssociationMultiModel(int2 * modelSDFIndices,
+                                             const int * dataAssociation,
+                                             const int width,
+                                             const int height,
+                                             const int2 unassociatedVals = make_int2(-1,-1));
+
 }
 
 #endif // DATA_ASSOCIATION_VIZ_H
