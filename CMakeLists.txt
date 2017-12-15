@@ -9,11 +9,14 @@ endif()
 
 # turn on c++11
 add_definitions(-std=c++11)
+add_definitions(-Wno-deprecated)
+add_definitions(-Wno-deprecated-declarations)
 
 # set CMakeModule path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
 # find packages with modules
+find_package(catkin REQUIRED)
 find_package(CUDA REQUIRED)
 find_package(PNG REQUIRED)
 find_package(OpenGL REQUIRED QUIET)
@@ -21,7 +24,7 @@ find_package(GLUT REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(DEPTHSENSE)
 find_package(OpenNI2)
-find_package(freenect2) # Kinect 2
+#find_package(freenect2) # Kinect 2
 
 # find packages with pkg-config
 find_package(PkgConfig)
@@ -32,6 +35,14 @@ pkg_check_modules(assimp assimp)
 
 set(DEPEND_LIBRARIES "")
 set(DEPEND_INCLUDES "")
+
+# add ros depth source
+set(depth_source_src
+  ${depth_source_src}
+  ${PROJECT_SOURCE_DIR}/src/depth_sources/ros_depth_source.h
+  ${PROJECT_SOURCE_DIR}/src/depth_sources/ros_depth_source.cpp
+  )
+
 
 # set conditional sources
 if(OPENNI2_FOUND)
@@ -57,14 +68,6 @@ if(DEPTHSENSE_FOUND)
         ${depth_source_src}
         ${PROJECT_SOURCE_DIR}/src/depth_sources/depthsense_depth_source.h
         ${PROJECT_SOURCE_DIR}/src/depth_sources/depthsense_depth_source.cpp
-    )
-endif()
-
-if(PMD_FOUND)
-    set(depth_source_src
-        ${depth_source_src}
-        ${PROJECT_SOURCE_DIR}/src/depth_sources/pmd_depth_source.h
-        ${PROJECT_SOURCE_DIR}/src/depth_sources/pmd_depth_source.cpp
     )
 endif()
 
@@ -98,7 +101,6 @@ if(assimp_FOUND)
 endif()
 
 # catkin
-find_package(catkin REQUIRED)
 catkin_package(
   INCLUDE_DIRS
     ${PROJECT_SOURCE_DIR}
@@ -141,8 +143,8 @@ link_libraries(
     ${GLEW_LIBRARIES}
     ${tinyxml_LIBRARIES}
     ${matheval_LIBRARIES}
-	${freenect2_LIBRARY}
-	/home/fleeb/kct_driver/libfreenect2/depends/libusb/lib/libusb-1.0.so
+    ${freenect2_LIBRARY}
+    #/home/fleeb/kct_driver/libfreenect2/depends/libusb/lib/libusb-1.0.so
 )
 
 # set dart source

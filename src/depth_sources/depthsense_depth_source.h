@@ -12,7 +12,7 @@ namespace dart {
 class DepthSenseDepthSource : public DepthSource<ushort,uchar3> {
 public:
     DepthSenseDepthSource();
-    ~DepthSenseDepthSource();
+    virtual ~DepthSenseDepthSource();
 
     bool initialize(const bool getColor=true,
                     const bool enableDenoising=true,
