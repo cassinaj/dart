@@ -19,7 +19,7 @@ namespace dart
  * Current supported encodings:
  *  - TYPE_32FC1
  */
-class RosDepthSource : public DepthSource<float, uchar3>
+class RosDepthSource : public DepthSource<ushort, uchar3>
 {
   public:
     /**
@@ -46,8 +46,8 @@ class RosDepthSource : public DepthSource<float, uchar3>
      * received depth image.
      */
     void advance() override;
-    const float* getDepth() const override { return depth_data_; }
-    const float* getDeviceDepth() const override { return device_depth_data_; }
+    const ushort* getDepth() const override { return depth_data_; }
+    const ushort* getDeviceDepth() const override { return device_depth_data_; }
     const uchar3* getColor() const override { return nullptr; }
     bool hasRadialDistortionParams() const override { return false; }
     ColorLayout getColorLayout() const override { return LAYOUT_RGB; }
@@ -65,12 +65,12 @@ class RosDepthSource : public DepthSource<float, uchar3>
     std::mutex depth_camera_image_mutex_;
 
     /// Depth image data
-    float* depth_data_;
-    float* device_depth_data_;
+    ushort* depth_data_;
+    ushort* device_depth_data_;
     uint64_t depth_time_;
 
     /// Latest depth image received
-    float* next_depth_data_;
+    ushort* next_depth_data_;
     uint64_t next_depth_time_;
 
     /// ROS Subscribers

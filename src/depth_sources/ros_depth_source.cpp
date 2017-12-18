@@ -1,17 +1,19 @@
 
 #include "ros_depth_source.h"
+#include "util/cuda_utils.h"
 
 #include <cuda_runtime.h>
 #include <sensor_msgs/image_encodings.h>
 #include <string.h>
 #include <vector_types.h>
 #include <iostream>
+#include <thread>
 #include <vector>
 
 namespace dart
 {
 RosDepthSource::RosDepthSource()
-    : DepthSource<float, uchar3>(),
+    : DepthSource<ushort, uchar3>(),
       depth_data_(nullptr),
       depth_time_(0),
       next_depth_data_(nullptr),
@@ -62,10 +64,16 @@ bool RosDepthSource::initialize(const std::string& depth_camera_topic_prefix,
         make_float2(depth_camera_info_.K[2], depth_camera_info_.K[5]);
 
     // Allocate depth image memory on host and device.
-    depth_data_ = new float[_depthWidth * _depthHeight];
-    memset(depth_data_, 0, _depthWidth * _depthHeight * sizeof(float));
-    cudaMalloc(&device_depth_data_, _depthWidth * _depthHeight * sizeof(float));
-    next_depth_data_ = new float[_depthWidth * _depthHeight];
+    depth_data_ = new ushort[_depthWidth * _depthHeight];
+    next_depth_data_ = new ushort[_depthWidth * _depthHeight];
+    memset(depth_data_, 0, _depthWidth * _depthHeight * sizeof(ushort));
+    memset(next_depth_data_, 0, _depthWidth * _depthHeight * sizeof(ushort));
+
+    cudaMalloc(&device_depth_data_,
+               _depthWidth * _depthHeight * sizeof(ushort));
+    advance();
+
+    CheckCudaDieOnError();
 
     _hasTimestamps = true;
     _isLive = true;
@@ -80,19 +88,23 @@ bool RosDepthSource::initialize(const std::string& depth_camera_topic_prefix,
         &RosDepthSource::depth_camera_image_callback,
         this);
 
-    advance();
-
     return true;
 }
 
 void RosDepthSource::advance()
 {
+    if (!depth_camera_info_available_.load())
+    {
+        // Camera info not available yet, skip callback if called too early.
+        return;
+    }
+
     // This updates the depth data with the latest received image.
     {
         std::unique_lock<std::mutex> lock(depth_camera_image_mutex_);
         if (next_depth_time_ > depth_time_)
         {
-            float* tmp = depth_data_;
+            ushort* tmp = depth_data_;
             depth_data_ = next_depth_data_;
             next_depth_data_ = tmp;
             depth_time_ = next_depth_time_;
@@ -101,13 +113,16 @@ void RosDepthSource::advance()
         }
     }
 
+    CheckCudaDieOnError();
     // Copy data to device.
-    // TODO Check why this is performed on every cycle even if no new image is
+    // TODO Check why this is performed on every cycle even if no new
+    // image is
     // available.
     cudaMemcpy(device_depth_data_,
                depth_data_,
-               _depthWidth * _depthHeight * sizeof(float),
+               _depthWidth * _depthHeight * sizeof(ushort),
                cudaMemcpyHostToDevice);
+    CheckCudaDieOnError();
 }
 
 void RosDepthSource::depth_camera_info_callback(
@@ -139,17 +154,24 @@ void RosDepthSource::depth_camera_image_callback(const sensor_msgs::Image& msg)
     {
         std::unique_lock<std::mutex> lock(depth_camera_image_mutex_);
         const size_t bytes = msg.data.size();
-        const size_t floats = bytes / sizeof(float);
+        const size_t pixels = bytes / sizeof(float);
 
-        if (floats != _depthWidth * _depthHeight)
+        if (pixels != _depthWidth * _depthHeight)
         {
             throw std::runtime_error(
-                "Mismatch between camera depth image float count and camera "
+                "Mismatch between camera depth image float count and camera"
                 "info pixels: " +
-                std::to_string(floats) + " vs " +
+                std::to_string(pixels) + " vs " +
                 std::to_string(_depthWidth * _depthHeight));
         }
-        memcpy(next_depth_data_, (float*)&msg.data[0], floats);
+        auto data = (const float*)&msg.data[0];
+        auto scaled_data = new ushort[pixels];
+        for (int i = 0; i < pixels; ++i)
+        {
+            scaled_data[i] = 1000 * data[i];
+        }
+        memcpy(next_depth_data_, scaled_data, pixels * sizeof(ushort));
+        delete[] scaled_data;
         next_depth_time_ = msg.header.stamp.toNSec();
     }
 }
