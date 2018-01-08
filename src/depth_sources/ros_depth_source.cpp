@@ -13,7 +13,7 @@
 namespace dart
 {
 RosDepthSource::RosDepthSource()
-    : DepthSource<ushort, uchar3>(),
+    : DepthSource<float, uchar3>(),
       depth_data_(nullptr),
       depth_time_(0),
       next_depth_data_(nullptr),
@@ -64,13 +64,12 @@ bool RosDepthSource::initialize(const std::string& depth_camera_topic_prefix,
         make_float2(depth_camera_info_.K[2], depth_camera_info_.K[5]);
 
     // Allocate depth image memory on host and device.
-    depth_data_ = new ushort[_depthWidth * _depthHeight];
-    next_depth_data_ = new ushort[_depthWidth * _depthHeight];
-    memset(depth_data_, 0, _depthWidth * _depthHeight * sizeof(ushort));
-    memset(next_depth_data_, 0, _depthWidth * _depthHeight * sizeof(ushort));
+    depth_data_ = new float[_depthWidth * _depthHeight];
+    next_depth_data_ = new float[_depthWidth * _depthHeight];
+    memset(depth_data_, 0, _depthWidth * _depthHeight * sizeof(float));
+    memset(next_depth_data_, 0, _depthWidth * _depthHeight * sizeof(float));
 
-    cudaMalloc(&device_depth_data_,
-               _depthWidth * _depthHeight * sizeof(ushort));
+    cudaMalloc(&device_depth_data_, _depthWidth * _depthHeight * sizeof(float));
     advance();
 
     CheckCudaDieOnError();
@@ -104,7 +103,7 @@ void RosDepthSource::advance()
         std::unique_lock<std::mutex> lock(depth_camera_image_mutex_);
         if (next_depth_time_ > depth_time_)
         {
-            ushort* tmp = depth_data_;
+            float* tmp = depth_data_;
             depth_data_ = next_depth_data_;
             next_depth_data_ = tmp;
             depth_time_ = next_depth_time_;
@@ -120,7 +119,7 @@ void RosDepthSource::advance()
     // available.
     cudaMemcpy(device_depth_data_,
                depth_data_,
-               _depthWidth * _depthHeight * sizeof(ushort),
+               _depthWidth * _depthHeight * sizeof(float),
                cudaMemcpyHostToDevice);
     CheckCudaDieOnError();
 }
@@ -165,13 +164,12 @@ void RosDepthSource::depth_camera_image_callback(const sensor_msgs::Image& msg)
                 std::to_string(_depthWidth * _depthHeight));
         }
         auto data = (const float*)&msg.data[0];
-        auto scaled_data = new ushort[pixels];
+        // auto scaled_data = new float[pixels];
         for (int i = 0; i < pixels; ++i)
         {
-            scaled_data[i] = 1000 * data[i];
+            next_depth_data_[i] = 1000 * data[i];
         }
-        memcpy(next_depth_data_, scaled_data, pixels * sizeof(ushort));
-        delete[] scaled_data;
+        // memcpy(next_depth_data_, scaled_data, pixels * sizeof(float));
         next_depth_time_ = msg.header.stamp.toNSec();
     }
 }

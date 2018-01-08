@@ -33,16 +33,11 @@ Tracker::Tracker()
       _planeNormals(0),
       _dampingMatrices(0)
 {
-    glewInit();
-
 #if ASSIMP_BUILD
     Model::initializeRenderer(new AssimpMeshReader());
 #else
     Model::initializeRenderer();
 #endif  // ASSIMP_BUILD
-
-    cudaGLSetGLDevice(0);
-    cudaDeviceReset();
 }
 
 Tracker::~Tracker()
@@ -324,8 +319,6 @@ bool Tracker::addModel(const std::string &filename,
             _opts.lambdaIntersection[i] = 0;
         }
     }
-
-    CheckCudaDieOnError();
 
     return true;
 }
