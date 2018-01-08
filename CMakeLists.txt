@@ -16,7 +16,7 @@ add_definitions(-Wno-deprecated-declarations)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
 # find packages with modules
-find_package(catkin REQUIRED)
+find_package(catkin REQUIRED roscpp std_msgs sensor_msgs)
 find_package(CUDA REQUIRED)
 find_package(PNG REQUIRED)
 find_package(OpenGL REQUIRED QUIET)
@@ -102,6 +102,8 @@ endif()
 
 # catkin
 catkin_package(
+  CATKIN_DEPENDS
+    roscpp std_msgs sensor_msgs
   INCLUDE_DIRS
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/src
@@ -112,7 +114,7 @@ catkin_package(
     ${GLEW_INCLUDE_DIRS}
     ${tinyxml_INCLUDE_DIR}
     ${DEPEND_INCLUDES}
-	${freenect2_INCLUDE_DIRS}
+	  ${freenect2_INCLUDE_DIRS}
   LIBRARIES
     dart
     ${PNG_LIBRARIES}
@@ -122,21 +124,22 @@ catkin_package(
     ${tinyxml_LIBRARIES}
     ${matheval_LIBRARIES}
     ${DEPEND_LIBRARIES}
-	${freenect2_LIBRARY}
+	  ${freenect2_LIBRARY}
 )
 
-
 include_directories(
+    ${catkin_INCLUDE_DIRS}
     ${eigen3_INCLUDE_DIRS}
     ${PNG_INCLUDE_DIRS}
     ${OPENGL_INCLUDE_DIR}
     ${GLUT_INCLUDE_DIR}
     ${GLEW_INCLUDE_DIRS}
     ${tinyxml_INCLUDE_DIR}
-	${freenect2_INCLUDE_DIRS}
+	  ${freenect2_INCLUDE_DIRS}
 )
 link_directories(${tinyxml_LIBRARY_DIRS})
 link_libraries(
+    ${catkin_LIBRARIES}
     ${PNG_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${GLUT_glut_LIBRARY}
