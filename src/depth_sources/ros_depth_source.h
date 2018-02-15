@@ -57,6 +57,12 @@ class RosDepthSource : public DepthSource<float, uchar3>
     uint64_t getColorTime() const override { return 0; }
     const sensor_msgs::CameraInfo depth_camera_info() const;
 
+    void setScalingFactor(float scaling_factor)
+    {
+        std::unique_lock<std::mutex> lock(depth_camera_image_mutex_);
+        scaling_factor_ = scaling_factor;
+    }
+
   private:
     void depth_camera_info_callback(const sensor_msgs::CameraInfo& msg);
     void depth_camera_image_callback(const sensor_msgs::Image& msg);
@@ -65,6 +71,7 @@ class RosDepthSource : public DepthSource<float, uchar3>
     std::mutex depth_camera_image_mutex_;
 
     /// Depth image data
+    float scaling_factor_;
     float* depth_data_;
     float* device_depth_data_;
     uint64_t depth_time_;

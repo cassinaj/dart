@@ -17,7 +17,8 @@ RosDepthSource::RosDepthSource()
       depth_data_(nullptr),
       depth_time_(0),
       next_depth_data_(nullptr),
-      next_depth_time_(0)
+      next_depth_time_(0),
+      scaling_factor_(1000.f)
 {
 }
 
@@ -142,14 +143,7 @@ void RosDepthSource::depth_camera_image_callback(const sensor_msgs::Image& msg)
 
     // Supported encoding:
     //  - 32FC1 (Single channel 32 bit floating point)
-    if (msg.encoding != sensor_msgs::image_encodings::TYPE_32FC1)
-    {
-        ROS_WARN_STREAM_THROTTLE(
-            1,
-            "Depth image encoding not supported. "
-                << "Supported image encoding: \n - TYPE_32FC1");
-        return;
-    }
+    if (msg.encoding == sensor_msgs::image_encodings::TYPE_32FC1)
     {
         std::unique_lock<std::mutex> lock(depth_camera_image_mutex_);
         const size_t bytes = msg.data.size();
@@ -167,10 +161,43 @@ void RosDepthSource::depth_camera_image_callback(const sensor_msgs::Image& msg)
         // auto scaled_data = new float[pixels];
         for (int i = 0; i < pixels; ++i)
         {
-            next_depth_data_[i] = 1000 * data[i];
+            next_depth_data_[i] = scaling_factor_ * data[i];
         }
         // memcpy(next_depth_data_, scaled_data, pixels * sizeof(float));
         next_depth_time_ = msg.header.stamp.toNSec();
+    }
+    // else if (msg.encoding == sensor_msgs::image_encodings::TYPE_16UC1)
+    // {
+    //     std::unique_lock<std::mutex> lock(depth_camera_image_mutex_);
+    //     const size_t bytes = msg.data.size();
+    //     const size_t pixels = bytes / sizeof(unsigned short);
+
+    //     if (pixels != _depthWidth * _depthHeight)
+    //     {
+    //         throw std::runtime_error(
+    //             "Mismatch between camera depth image pixel count and camera"
+    //             " info pixels: " +
+    //             std::to_string(pixels) + " vs " +
+    //             std::to_string(_depthWidth * _depthHeight));
+    //     }
+    //     auto data = (const unsigned short*)&msg.data[0];
+    //     // auto scaled_data = new float[pixels];
+    //     for (int i = 0; i < pixels; ++i)
+    //     {
+    //         // next_depth_data_[i] = 1000 * data[i];
+    //         next_depth_data_[i] = data[i] / 8.;
+    //     }
+    //     // memcpy(next_depth_data_, scaled_data, pixels * sizeof(float));
+    //     next_depth_time_ = msg.header.stamp.toNSec();
+    // }
+    else
+    {
+        ROS_WARN_STREAM_THROTTLE(1,
+                                 "Depth image encoding not supported. "
+                                     << "Supported image encoding: "
+                                     << "\n - TYPE_32FC1"
+                                     << "\n TYPE_16UC1");
+        return;
     }
 }
 }
