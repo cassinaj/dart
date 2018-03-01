@@ -18,7 +18,8 @@ RosDepthSource::RosDepthSource()
       depth_time_(0),
       next_depth_data_(nullptr),
       next_depth_time_(0),
-      scaling_factor_(1000.f)
+      scaling_factor_(1000.f),
+      subsampling_factor_(1)
 {
 }
 
@@ -158,11 +159,20 @@ void RosDepthSource::depth_camera_image_callback(const sensor_msgs::Image& msg)
                 std::to_string(_depthWidth * _depthHeight));
         }
         auto data = (const float*)&msg.data[0];
-        // auto scaled_data = new float[pixels];
-        for (int i = 0; i < pixels; ++i)
-        {
-            next_depth_data_[i] = scaling_factor_ * data[i];
+        // make efficient, use memcpy!
+        for(int i = 0; i < pixels; ++i){
+            next_depth_data_[i] = 0.f;
         }
+        for (int i = 0; i < _depthHeight; i+=subsampling_factor_){
+          for (int j = 0; j < _depthWidth; j+=subsampling_factor_){
+                next_depth_data_[i * _depthWidth + j] = 
+                   scaling_factor_ * data[i * _depthWidth + j];
+          }
+        }
+        //for (int i = 0; i < pixels; ++i)
+        //{ 
+        //    next_depth_data_[i] = scaling_factor_ * data[i];
+        //}
         // memcpy(next_depth_data_, scaled_data, pixels * sizeof(float));
         next_depth_time_ = msg.header.stamp.toNSec();
     }

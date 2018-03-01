@@ -63,6 +63,12 @@ class RosDepthSource : public DepthSource<float, uchar3>
         scaling_factor_ = scaling_factor;
     }
 
+    void setSubsamplingFactor(int subsampling_factor)
+    {
+        std::unique_lock<std::mutex> lock(depth_camera_image_mutex_);
+        subsampling_factor_ = subsampling_factor;
+    }
+
   private:
     void depth_camera_info_callback(const sensor_msgs::CameraInfo& msg);
     void depth_camera_image_callback(const sensor_msgs::Image& msg);
@@ -72,6 +78,7 @@ class RosDepthSource : public DepthSource<float, uchar3>
 
     /// Depth image data
     float scaling_factor_;
+    int subsampling_factor_;
     float* depth_data_;
     float* device_depth_data_;
     uint64_t depth_time_;
