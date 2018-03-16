@@ -159,47 +159,20 @@ void RosDepthSource::depth_camera_image_callback(const sensor_msgs::Image& msg)
                 std::to_string(_depthWidth * _depthHeight));
         }
         auto data = (const float*)&msg.data[0];
-        // make efficient, use memcpy!
-        for(int i = 0; i < pixels; ++i){
+        for (int i = 0; i < pixels; ++i)
+        {
             next_depth_data_[i] = 0.f;
         }
-        for (int i = 0; i < _depthHeight; i+=subsampling_factor_){
-          for (int j = 0; j < _depthWidth; j+=subsampling_factor_){
-                next_depth_data_[i * _depthWidth + j] = 
-                   scaling_factor_ * data[i * _depthWidth + j];
-          }
+        for (int i = 0; i < _depthHeight; i += subsampling_factor_)
+        {
+            for (int j = 0; j < _depthWidth; j += subsampling_factor_)
+            {
+                next_depth_data_[i * _depthWidth + j] =
+                    scaling_factor_ * data[i * _depthWidth + j];
+            }
         }
-        //for (int i = 0; i < pixels; ++i)
-        //{ 
-        //    next_depth_data_[i] = scaling_factor_ * data[i];
-        //}
-        // memcpy(next_depth_data_, scaled_data, pixels * sizeof(float));
         next_depth_time_ = msg.header.stamp.toNSec();
     }
-    // else if (msg.encoding == sensor_msgs::image_encodings::TYPE_16UC1)
-    // {
-    //     std::unique_lock<std::mutex> lock(depth_camera_image_mutex_);
-    //     const size_t bytes = msg.data.size();
-    //     const size_t pixels = bytes / sizeof(unsigned short);
-
-    //     if (pixels != _depthWidth * _depthHeight)
-    //     {
-    //         throw std::runtime_error(
-    //             "Mismatch between camera depth image pixel count and camera"
-    //             " info pixels: " +
-    //             std::to_string(pixels) + " vs " +
-    //             std::to_string(_depthWidth * _depthHeight));
-    //     }
-    //     auto data = (const unsigned short*)&msg.data[0];
-    //     // auto scaled_data = new float[pixels];
-    //     for (int i = 0; i < pixels; ++i)
-    //     {
-    //         // next_depth_data_[i] = 1000 * data[i];
-    //         next_depth_data_[i] = data[i] / 8.;
-    //     }
-    //     // memcpy(next_depth_data_, scaled_data, pixels * sizeof(float));
-    //     next_depth_time_ = msg.header.stamp.toNSec();
-    // }
     else
     {
         ROS_WARN_STREAM_THROTTLE(1,

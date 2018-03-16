@@ -4,14 +4,26 @@
 
 #include <Eigen/Eigen>
 #include <Eigen/Sparse>
+#include <chrono>
 
+#include <visualization/matrix_viz.h>
 #include "geometry/distance_transforms.h"
 #include "kernels/intersection.h"
 #include "kernels/modToObs.h"
 #include "kernels/obsToMod.h"
 #include "util/cuda_utils.h"
 #include "util/ostream_operators.h"
-#include "visualization/matrix_viz.h"
+
+//#define PRINT_TIME(x) std::cout << #x << ": " << x << std::endl;
+#define PRINT_TIME(x) 
+
+float elapsed_time(const std::chrono::steady_clock::time_point &start)
+{
+    auto end = std::chrono::steady_clock::now();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+               .count() /
+           1.e6;
+}
 
 namespace dart
 {
@@ -764,7 +776,13 @@ void Optimizer::optimizePoses(
     std::vector<Prior *> &priors,
     std::map<int, PosePrior> &posePriors)
 {
-    CheckCudaDieOnError();
+    // std::cout << " --- optimization begin ----------------------- "
+    //           << std::endl;
+    auto start_total = std::chrono::steady_clock::now();
+
+    float elapsed_total = elapsed_time(start_total);
+    PRINT_TIME(elapsed_total);
+    auto start = std::chrono::steady_clock::now();
 
     // resize scratch space if there are more models than we've seen before
     const int nModels = models.size();
@@ -789,7 +807,10 @@ void Optimizer::optimizePoses(
         _maxModels = nModels;
     }
 
-    CheckCudaDieOnError();
+    // std::cout << "memory (re-)allocation: " << elapsed_time(start) << std::endl;
+    start = std::chrono::steady_clock::now();
+    elapsed_total = elapsed_time(start_total);
+    PRINT_TIME(elapsed_total);
 
     bool predictionsNeeded = (opts.lambdaModToObs > 0);
     Observation observation(dObsVertMap, dObsNormMap, width, height);
@@ -821,6 +842,11 @@ void Optimizer::optimizePoses(
         }
     }
 
+    // std::cout << "generating Obs SDF: " << elapsed_time(start) << std::endl;
+    start = std::chrono::steady_clock::now();
+    elapsed_total = elapsed_time(start_total);
+    PRINT_TIME(elapsed_total);
+
     CheckCudaDieOnError();
 
     int sysSize = 0;
@@ -845,8 +871,37 @@ void Optimizer::optimizePoses(
 
     CheckCudaDieOnError();
 
+    struct TimeStats
+    {
+        float prediction_renderer;
+        float error_and_data_association;
+        float obs_to_model;
+        float model_to_obs;
+        float intersection;
+        float objective_terms;
+        float syn_model_to_obs;
+        float priors;
+        float solve;
+        float finalize;
+        TimeStats()
+            : prediction_renderer(0.f),
+              error_and_data_association(0.f),
+              obs_to_model(0.f),
+              model_to_obs(0.f),
+              intersection(0.f),
+              objective_terms(0.f),
+              syn_model_to_obs(0.f),
+              priors(0.f),
+              solve(0.f),
+              finalize(0.f)
+        {
+        }
+    };
+    TimeStats time_stats;
+
     for (int iteration = 0; iteration < opts.numIterations; ++iteration)
     {
+        start = std::chrono::steady_clock::now();
         sparseJTJ.setZero();
         fullJTe = Eigen::VectorXf::Zero(sysSize);
 
@@ -871,7 +926,8 @@ void Optimizer::optimizePoses(
             _predictionRenderer->cullUnobservable(
                 dObsVertMap, width, height, _depthPredictStream);
         }
-        CheckCudaDieOnError();
+        time_stats.prediction_renderer += elapsed_time(start);
+        start = std::chrono::steady_clock::now();
 
         errorAndDataAssociationMultiModel(
             dObsVertMap,
@@ -895,7 +951,6 @@ void Optimizer::optimizePoses(
             opts.debugObsToModNorm ? _dDebugObsToModNorm : 0,
             _posInfoStream);
 
-        CheckCudaDieOnError();
         //        int sysSize = 3*opts.contactPriors.size();
         //        for (int m=0; m<nModels; ++m) { sysSize +=
         //        poses[m].getReducedDimensions(); }
@@ -912,6 +967,9 @@ void Optimizer::optimizePoses(
         //            associated to model " << m << std::endl;
         //        }
 
+        time_stats.error_and_data_association += elapsed_time(start);
+        start = std::chrono::steady_clock::now();
+
         CheckCudaDieOnError();
         int debugIntersectionOffset = 0;
         if (opts.debugIntersectionErr)
@@ -922,6 +980,10 @@ void Optimizer::optimizePoses(
         }
 
         CheckCudaDieOnError();
+        float obs_to_model_time = 0.f;
+        float model_to_obs_time = 0.f;
+        float intersection_time = 0.f;
+        float objective_terms_time = 0.f;
         for (int m = 0; m < nModels; ++m)
         {
             MirroredModel &model = *models[m];
@@ -950,6 +1012,9 @@ void Optimizer::optimizePoses(
                 _iterationSummaries[m][iteration].nAssociatedPoints =
                     _lastElements->hostPtr()[m];
             }
+
+            obs_to_model_time += elapsed_time(start);
+            start = std::chrono::steady_clock::now();
             CheckCudaDieOnError();
             if (opts.lambdaModToObs > 0)
             {
@@ -962,6 +1027,8 @@ void Optimizer::optimizePoses(
                     T_obsSdfs_camera[m],
                     opts);
             }
+            model_to_obs_time += elapsed_time(start);
+            start = std::chrono::steady_clock::now();
             CheckCudaDieOnError();
             if (opts.lambdaIntersection[m + m * nModels] > 0)
             {
@@ -978,6 +1045,7 @@ void Optimizer::optimizePoses(
                     debugIntersectionOffset);
             }
             CheckCudaDieOnError();
+
             for (int d = 0; d < nModels; ++d)
             {
                 if (d == m)
@@ -998,6 +1066,9 @@ void Optimizer::optimizePoses(
                                                     debugIntersectionOffset);
                 }
             }
+
+            intersection_time += elapsed_time(start);
+            start = std::chrono::steady_clock::now();
             CheckCudaDieOnError();
 
             // TODO: get rid of redundancy
@@ -1077,7 +1148,15 @@ void Optimizer::optimizePoses(
             fullJTe.segment(modelOffsets[m], reducedDimensions) = eJ;
 
             debugIntersectionOffset += collisionClouds[m]->length();
+
+            objective_terms_time += elapsed_time(start);
         }
+
+        time_stats.obs_to_model += obs_to_model_time;
+        time_stats.model_to_obs += model_to_obs_time;
+        time_stats.intersection += intersection_time;
+        time_stats.objective_terms += objective_terms_time;
+        start = std::chrono::steady_clock::now();
 
         if (opts.lambdaModToObs > 0)
         {
@@ -1088,6 +1167,9 @@ void Optimizer::optimizePoses(
                     _lastElements->hostPtr()[m];
             }
         }
+
+        time_stats.syn_model_to_obs += elapsed_time(start);
+        start = std::chrono::steady_clock::now();
 
         for (int p = 0; p < priors.size(); ++p)
         {
@@ -1100,8 +1182,14 @@ void Optimizer::optimizePoses(
                                            opts);
         }
 
+        time_stats.priors += elapsed_time(start);
+        start = std::chrono::steady_clock::now();
+
         Eigen::VectorXf paramUpdate =
             -sparseJTJ.triangularView<Eigen::Upper>().solve(fullJTe);
+
+        time_stats.solve += elapsed_time(start);
+        start = std::chrono::steady_clock::now();
 
         for (int m = 0; m < nModels; ++m)
         {
@@ -1149,9 +1237,14 @@ void Optimizer::optimizePoses(
             priors[p]->updatePriorParams(paramUpdate.data() + priorOffsets[p],
                                          models);
         }
+
+        time_stats.finalize += elapsed_time(start);
     }
 
-    CheckCudaDieOnError();
+    elapsed_total = elapsed_time(start_total);
+    PRINT_TIME(elapsed_total);
+
+    // CheckCudaDieOnError();
 
     if (opts.debugJTJ)
     {
@@ -1181,6 +1274,45 @@ void Optimizer::optimizePoses(
         _JTJimg->syncDeviceToHost();
     }
 
-    CheckCudaDieOnError();
+    // CheckCudaDieOnError();
+
+    // time_stats.obs_to_model /= opts.numIterations;
+    // time_stats.model_to_obs /= opts.numIterations;
+    // time_stats.intersection /= opts.numIterations;
+    // time_stats.objective_terms /= opts.numIterations;
+    // time_stats.syn_model_to_obs /= opts.numIterations;
+    // time_stats.priors /= opts.numIterations;
+    // time_stats.solve /= opts.numIterations;
+    // time_stats.finalize /= opts.numIterations;
+
+    PRINT_TIME(time_stats.prediction_renderer);
+    PRINT_TIME(time_stats.error_and_data_association);
+    PRINT_TIME(time_stats.obs_to_model);
+    PRINT_TIME(time_stats.model_to_obs);
+    PRINT_TIME(time_stats.intersection);
+    PRINT_TIME(time_stats.objective_terms);
+    PRINT_TIME(time_stats.syn_model_to_obs);
+    PRINT_TIME(time_stats.priors);
+    PRINT_TIME(time_stats.solve);
+    PRINT_TIME(time_stats.finalize);
+
+    float total_optimization_time = elapsed_time(start_total);
+    PRINT_TIME(total_optimization_time);
+
+    //                   std::cout
+    //                   << time_stats.prediction_renderer
+    //                   << "prediction renderer " << std::endl;
+    // std::cout << time_stats.error_and_data_association
+    //           << "error_and_data_association " << std::endl;
+    // std::cout << time_stats.obs_to_model << "obs to model " << std::endl;
+    // std::cout << time_stats.model_to_obs << "model_to_obs " << std::endl;
+    // std::cout << time_stats.intersection << "intersection " << std::endl;
+    // std::cout << time_stats.objective_terms << "objective terms " <<
+    // std::endl;
+    // std::cout << time_stats.syn_model_to_obs << "syn model to obs "
+    //           << std::endl;
+    // std::cout << time_stats.priors << "priors " << std::endl;
+    // std::cout << time_stats.solve << "solve " << std::endl;
+    // std::cout << "finalize: " << time_stats.finalize << std::endl;
 }
 }

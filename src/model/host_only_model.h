@@ -69,7 +69,10 @@ class HostOnlyModel : public Model
                  std::string axisZ,
                  std::string jointMin,
                  std::string jointMax,
-                 std::string jointName);
+                 std::string jointName,
+                 std::string mimicJoint,
+                 std::string mimicFactor,
+                 std::string mimicBias);
 
     void computeStructure();
     void voxelize(float resolution,
@@ -86,6 +89,44 @@ class HostOnlyModel : public Model
                           unsigned char blue);
 
     // model queries
+    inline bool hasMimicJoints() const { return mimicJointMap.size() > 0; }
+    inline int getNumMimicJoints() const { return mimicJointMap.size(); }
+    inline bool isMimicJoint(int jointIndex) const
+    {
+        return mimicJointMap.find(jointIndex) != mimicJointMap.end();
+    }
+
+    inline int getMimicJointSource(int jointIndex) const
+    {
+        if (!isMimicJoint(jointIndex))
+        {
+            std::cerr << "Joint " << jointIndex << " is not a mimic joint."
+                      << std::endl;
+        }
+
+        return mimicJointMap.find(jointIndex)->second;
+    }
+    inline float getMimicFactor(int jointIndex) const
+    {
+        if (!isMimicJoint(jointIndex))
+        {
+            std::cerr << "Joint " << jointIndex << " is not a mimic joint."
+                      << std::endl;
+        }
+
+        return mimicFactorMap.find(jointIndex)->second;
+    }
+
+    inline float getMimicBias(int jointIndex) const
+    {
+        if (!isMimicJoint(jointIndex))
+        {
+            std::cerr << "Joint " << jointIndex << " is not a mimic joint."
+                      << std::endl;
+        }
+
+        return mimicBiasMap.find(jointIndex)->second;
+    }
     inline uint getNumFrames() const { return _nFrames; }
     inline int getFrameParent(const int frame) const { return _parents[frame]; }
     inline int getFrameNumChildren(const int frame) const
@@ -265,6 +306,12 @@ class HostOnlyModel : public Model
     std::vector<float3> _orientations;
     std::vector<std::vector<std::string> > _frameParamExpressions;
     std::vector<std::vector<std::string> > _geomParamExpressions;
+
+    std::map<std::string, int> jointNameIndexMap;
+    std::vector<std::string> mimicJoints;
+    std::map<int, int> mimicJointMap;
+    std::map<int, float> mimicFactorMap;
+    std::map<int, float> mimicBiasMap;
 
     void voxelizeFrame(Grid3D<float>& vg,
                        const int frame,

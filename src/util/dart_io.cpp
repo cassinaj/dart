@@ -44,6 +44,7 @@ void readFrameXML(const int parent,
             std::string jointMin = child->Attribute("jointMin");
             std::string jointMax = child->Attribute("jointMax");
             std::string posX, posY, posZ, oriX, oriY, oriZ, axisX, axisY, axisZ;
+            std::string mimicJoint, mimicFactor, mimicBias;
             for (TiXmlElement *grandChild = child->FirstChildElement();
                  grandChild != 0;
                  grandChild = grandChild->NextSiblingElement())
@@ -66,6 +67,12 @@ void readFrameXML(const int parent,
                     axisY = grandChild->Attribute("y");
                     axisZ = grandChild->Attribute("z");
                 }
+                else if (strcmp(grandChild->Value(), "mimic") == 0)
+                {
+                    mimicJoint = grandChild->Attribute("joint");
+                    mimicFactor = grandChild->Attribute("factor");
+                    mimicBias = grandChild->Attribute("bias");
+                }
             }
             int ID = model.addFrame(parent,
                                     jointType,
@@ -80,7 +87,10 @@ void readFrameXML(const int parent,
                                     axisZ,
                                     jointMin,
                                     jointMax,
-                                    jointName);
+                                    jointName,
+                                    mimicJoint,
+                                    mimicFactor,
+                                    mimicBias);
             readFrameXML(ID, model, child, dir, version);
         }
         else if (strcmp(child->Value(), "geom") == 0)

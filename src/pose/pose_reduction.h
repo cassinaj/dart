@@ -7,6 +7,8 @@
 
 namespace dart
 {
+class HostOnlyModel;
+
 class PoseReduction
 {
   public:
@@ -43,6 +45,7 @@ class PoseReduction
 class LinearPoseReduction : public PoseReduction
 {
   public:
+    static LinearPoseReduction* CreateFromModel(const HostOnlyModel* model);
     LinearPoseReduction(const int fullDims, const int redDims);
 
     LinearPoseReduction(const int fullDims,
@@ -70,6 +73,18 @@ class LinearPoseReduction : public PoseReduction
     }
 
     inline virtual bool isParamMap() const { return false; }
+    void print() const
+    {
+        for (int f = 0; f < _fullDims; ++f)
+        {
+            for (int r = 0; r < _redDims; ++r)
+            {
+                std::cout << _A[r + _redDims * f] << ", ";
+            }
+            std::cout << std::endl;
+        }
+    }
+
   protected:
     MirroredVector<float> _A;
     float* _b;

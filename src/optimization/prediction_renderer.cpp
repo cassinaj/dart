@@ -9,48 +9,54 @@
 
 #include <GL/glx.h>
 
-namespace dart {
+namespace dart
+{
+const char *depthVertShaderSrc =
+    "#version 130\n"
+    "varying vec4 world_pos;\n"
+    "uniform mat4 gl_ModelViewMatrix;"
+    "void main(void)\n"
+    "{\n"
+    "       gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+    "       world_pos = gl_ModelViewMatrix*gl_Vertex;\n"
+    "}\n";
 
-const char * depthVertShaderSrc = "#version 130\n"
-        "varying vec4 world_pos;\n"
-        "uniform mat4 gl_ModelViewMatrix;"
-        "void main(void)\n"
-        "{\n"
-        "       gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
-        "       world_pos = gl_ModelViewMatrix*gl_Vertex;\n"
-        "}\n";
+const char *depthFragShaderSrc =
+    "#version 130\n"
+    "out vec4 out_Color;\n"
+    "varying vec4 world_pos;\n"
+    "void main(void)\n"
+    "{\n"
+    "   out_Color = vec4(world_pos.z,world_pos.z,world_pos.z,1.0);\n"
+    "}\n";
 
-const char * depthFragShaderSrc = "#version 130\n"
-        "out vec4 out_Color;\n"
-        "varying vec4 world_pos;\n"
-        "void main(void)\n"
-        "{\n"
-        "   out_Color = vec4(world_pos.z,world_pos.z,world_pos.z,1.0);\n"
-        "}\n";
+const char *labeledVertShaderSrc =
+    "#version 130\n"
+    "varying vec4 world_pos;\n"
+    "varying float id;\n"
+    "uniform mat4 gl_ModelViewMatrix;"
+    "void main()\n"
+    "{\n"
+    "   gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+    "   world_pos = gl_ModelViewMatrix*gl_Vertex;"
+    "   id = gl_Color.x + gl_Color.z + 65536;\n"
+    "}";
 
-const char * labeledVertShaderSrc = "#version 130\n"
-        "varying vec4 world_pos;\n"
-        "varying float id;\n"
-        "uniform mat4 gl_ModelViewMatrix;"
-        "void main()\n"
-        "{\n"
-        "   gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
-        "   world_pos = gl_ModelViewMatrix*gl_Vertex;"
-        "   id = gl_Color.x + gl_Color.z + 65536;\n"
-        "}";
+const char *labeledFragShaderSrc =
+    "#version 130\n"
+    "out vec4 out_Color;\n"
+    "varying vec4 world_pos;\n"
+    "varying float id;\n"
+    "void main(void)\n"
+    "{\n"
+    "       out_Color = vec4(world_pos.x,world_pos.y,world_pos.z,id);\n"
+    "}\n";
 
-const char * labeledFragShaderSrc = "#version 130\n"
-        "out vec4 out_Color;\n"
-        "varying vec4 world_pos;\n"
-        "varying float id;\n"
-        "void main(void)\n"
-        "{\n"
-        "       out_Color = vec4(world_pos.x,world_pos.y,world_pos.z,id);\n"
-        "}\n";
-
-PredictionRenderer::PredictionRenderer(const int width, const int height, const float2 focalLength) :
-     _focalLength(focalLength), _debugBoxIntersections(width*height) {
-
+PredictionRenderer::PredictionRenderer(const int width,
+                                       const int height,
+                                       const float2 focalLength)
+    : _focalLength(focalLength), _debugBoxIntersections(width * height)
+{
     _width = width;
     _height = height;
 
@@ -90,7 +96,8 @@ PredictionRenderer::PredictionRenderer(const int width, const int height, const 
         std::cerr << "glBindTexture: " << gluErrorString(glErr) << std::endl;
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA,
+    GL_FLOAT, 0);
 
     glErr = glGetError();
     if (glErr != GL_NO_ERROR) {
@@ -118,7 +125,8 @@ PredictionRenderer::PredictionRenderer(const int width, const int height, const 
     // init render buffer
     glGenRenderbuffersEXT(1, &_rbid);
     glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, _rbid);
-    glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, width, height);
+    glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, width,
+    height);
     glBindRenderbufferEXT(GL_RENDERBUFFER_EXT,0);
 
     err = cudaGetLastError();
@@ -130,8 +138,10 @@ PredictionRenderer::PredictionRenderer(const int width, const int height, const 
     // init frame buffer
     glGenFramebuffersEXT(1, &_fbid);
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, _fbid);
-    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, _tidRgb,0);//_texRgb->tid, 0);
-    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, _rbid); //_renderBuffer->rbid);
+    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+    GL_TEXTURE_2D, _tidRgb,0);//_texRgb->tid, 0);
+    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT,
+    GL_RENDERBUFFER_EXT, _rbid); //_renderBuffer->rbid);
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
     err = cudaGetLastError();
@@ -151,23 +161,22 @@ PredictionRenderer::PredictionRenderer(const int width, const int height, const 
     glAttachObjectARB(_program, _vertShader);
     glAttachObjectARB(_program, _fragShader);
     glLinkProgram(_program);*/
-    cudaMalloc(&_dPrediction,width*height*sizeof(float4));
-    cudaMemset(_dPrediction,0,width*height*sizeof(float4));
+    cudaMalloc(&_dPrediction, width * height * sizeof(float4));
+    cudaMemset(_dPrediction, 0, width * height * sizeof(float4));
 
-//    memcpy(_glK,glK,16*sizeof(double));
+    //    memcpy(_glK,glK,16*sizeof(double));
 
-//    err = cudaGetLastError();
-//    if (err != cudaSuccess) {
-//        printf("%s\n",cudaGetErrorString(err));
-//    }
-//    std::cout << "done" << std::endl;
+    //    err = cudaGetLastError();
+    //    if (err != cudaSuccess) {
+    //        printf("%s\n",cudaGetErrorString(err));
+    //    }
+    //    std::cout << "done" << std::endl;
 
-//    CheckGlDieOnError();
-
+    //    CheckGlDieOnError();
 }
 
-PredictionRenderer::~PredictionRenderer() {
-
+PredictionRenderer::~PredictionRenderer()
+{
     /*glDeleteFramebuffersEXT(1,&_fbid);
     glDeleteRenderbuffersEXT(1,&_rbid);
     glDeleteTextures(1,&_tidRgb);
@@ -175,34 +184,41 @@ PredictionRenderer::~PredictionRenderer() {
     glDetachObjectARB(_program,_fragShader);
     glDeleteProgramsARB(1,&_program);*/
     cudaFree(_dPrediction);
-
 }
 
-//void PredictionRenderer::renderPrediction(const Model & model,cudaStream_t & stream) {
+// void PredictionRenderer::renderPrediction(const Model & model,cudaStream_t &
+// stream) {
 //    std::vector<const Model*> models(1);
 //    models[0] = &model;
 //    renderPrediction(models,stream);
 //}
 
-void PredictionRenderer::raytracePrediction(const MirroredModel & model, cudaStream_t & stream) {
+void PredictionRenderer::raytracePrediction(const MirroredModel &model,
+                                            cudaStream_t &stream)
+{
     std::vector<const MirroredModel *> models(1);
     models[0] = &model;
-    raytracePrediction(models,stream);
+    raytracePrediction(models, stream);
 }
 
-void PredictionRenderer::raytracePrediction(const std::vector<const MirroredModel *> & models, cudaStream_t & stream) {
-
-    for (int m=0; m<models.size(); ++m) {
+void PredictionRenderer::raytracePrediction(
+    const std::vector<const MirroredModel *> &models, cudaStream_t &stream)
+{
+    for (int m = 0; m < models.size(); ++m)
+    {
         raycastPrediction(_focalLength,
-                          make_float2(_width/2,_height/2),
-                          _width,_height,m,
+                          make_float2(_width / 2, _height / 2),
+                          _width,
+                          _height,
+                          m,
                           models[m]->getTransformCameraToModel(),
                           models[m]->getDeviceTransformsModelToFrame(),
                           models[m]->getDeviceTransformsFrameToModel(),
                           models[m]->getDeviceSdfFrames(),
                           models[m]->getDeviceSdfs(),
                           models[m]->getNumSdfs(),
-                          _dPrediction,0,
+                          _dPrediction,
+                          0,
                           stream);
     }
 
@@ -211,12 +227,15 @@ void PredictionRenderer::raytracePrediction(const std::vector<const MirroredMode
     _debugBoxIntersections.syncDeviceToHost();
 
     cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        std::cerr << "gpu_raytracePrediction error: %s\n" << cudaGetErrorString(err) << std::endl;
+    if (err != cudaSuccess)
+    {
+        std::cerr << "gpu_raytracePrediction error: %s\n"
+                  << cudaGetErrorString(err) << std::endl;
     }
 }
 
-//void PredictionRenderer::renderPrediction(const std::vector<const Model *> & models, cudaStream_t & stream) {
+// void PredictionRenderer::renderPrediction(const std::vector<const Model *> &
+// models, cudaStream_t & stream) {
 
 //    CheckGlDieOnError();
 
@@ -264,7 +283,8 @@ void PredictionRenderer::raytracePrediction(const std::vector<const MirroredMode
 //    }
 ////    models[1]->renderLabeled(1);
 ////    gettimeofday(&end,NULL);
-////    std::cout << "render time: " << end.tv_usec - start.tv_usec + (1e6)*(end.tv_sec - start.tv_sec) << std::endl;
+////    std::cout << "render time: " << end.tv_usec - start.tv_usec +
+///(1e6)*(end.tv_sec - start.tv_sec) << std::endl;
 
 //    glPopMatrix();
 
@@ -281,20 +301,23 @@ void PredictionRenderer::raytracePrediction(const std::vector<const MirroredMode
 //    glClampColorARB(GL_CLAMP_FRAGMENT_COLOR_ARB, GL_TRUE);
 
 ////    static float4 *hPrediction = 0;
-////    if (hPrediction == 0) { cudaMallocHost(&hPrediction,_width*_height*sizeof(float4)); }
+////    if (hPrediction == 0) {
+///cudaMallocHost(&hPrediction,_width*_height*sizeof(float4)); }
 ////    glBindTexture(GL_TEXTURE_2D,_tidRgb);
 ////
 ////    gettimeofday(&start,NULL);
 ////    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, hPrediction);
 ////    gettimeofday(&end,NULL);
-////    std::cout << "get image time: " << end.tv_usec - start.tv_usec + (1e6)*(end.tv_sec - start.tv_sec) << std::endl;
+////    std::cout << "get image time: " << end.tv_usec - start.tv_usec +
+///(1e6)*(end.tv_sec - start.tv_sec) << std::endl;
 ////
-////    cudaMemcpyAsync(_dPrediction,hPrediction,_width*_height*sizeof(float4),cudaMemcpyHostToDevice,stream);
-
+////
+///cudaMemcpyAsync(_dPrediction,hPrediction,_width*_height*sizeof(float4),cudaMemcpyHostToDevice,stream);
 
 //    cudaGraphicsMapResources(1,&_resRgb,stream); //&_texRgb->cuda_res);
 //    cudaArray * cArray;
-//    cudaGraphicsSubResourceGetMappedArray(&cArray,_resRgb,0,0); //_texRgb->cuda_res,0,0);
+//    cudaGraphicsSubResourceGetMappedArray(&cArray,_resRgb,0,0);
+//    //_texRgb->cuda_res,0,0);
 
 //    cudaMemcpy2DFromArrayAsync(_dPrediction,_width*sizeof(float4),cArray,0,0,_width*sizeof(float4),_height,cudaMemcpyDeviceToDevice,stream);
 
@@ -302,36 +325,44 @@ void PredictionRenderer::raytracePrediction(const std::vector<const MirroredMode
 
 //}
 
-void PredictionRenderer::cullUnobservable(const float4 * dObsVertMap,
+void PredictionRenderer::cullUnobservable(const float4 *dObsVertMap,
                                           const int width,
                                           const int height,
-                                          const cudaStream_t stream) {
-
-    cullUnobservable_(_dPrediction,_width,_height,dObsVertMap,width,height,stream);
-
+                                          const cudaStream_t stream)
+{
+    cullUnobservable_(
+        _dPrediction, _width, _height, dObsVertMap, width, height, stream);
 }
 
-void PredictionRenderer::debugPredictionRay(const std::vector<const MirroredModel *> & models, const int x, const int y,
-                                            std::vector<MirroredVector<float3> > & boxIntersects,
-                                            std::vector<MirroredVector<float2> > & raySteps) {
-
-    for (int m=0; m<models.size(); ++m) {
+void PredictionRenderer::debugPredictionRay(
+    const std::vector<const MirroredModel *> &models,
+    const int x,
+    const int y,
+    std::vector<MirroredVector<float3> > &boxIntersects,
+    std::vector<MirroredVector<float2> > &raySteps)
+{
+    for (int m = 0; m < models.size(); ++m)
+    {
         std::cout << "debugging ray for " << m << std::endl;
         raycastPredictionDebugRay(_focalLength,
-                                  make_float2(_width/2,_height/2),
-                                  x,y,_width,m,
+                                  make_float2(_width / 2, _height / 2),
+                                  x,
+                                  y,
+                                  _width,
+                                  m,
                                   models[m]->getTransformCameraToModel(),
                                   models[m]->getDeviceTransformsModelToFrame(),
                                   models[m]->getDeviceTransformsFrameToModel(),
                                   models[m]->getDeviceSdfFrames(),
                                   models[m]->getDeviceSdfs(),
                                   models[m]->getNumSdfs(),
-                                  _dPrediction,0,
+                                  _dPrediction,
+                                  0,
                                   boxIntersects[m].devicePtr(),
-                                  raySteps[m].devicePtr(),raySteps[m].length());
+                                  raySteps[m].devicePtr(),
+                                  raySteps[m].length());
         boxIntersects[m].syncDeviceToHost();
         raySteps[m].syncDeviceToHost();
     }
 }
-
 }
