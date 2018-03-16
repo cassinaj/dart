@@ -1,6 +1,7 @@
 project("dart")
 cmake_minimum_required(VERSION 2.8)
 
+
 # build release if not explicitly told to build debug
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -8,11 +9,14 @@ endif()
 
 # turn on c++11
 add_definitions(-std=c++11)
+add_definitions(-Wno-deprecated)
+add_definitions(-Wno-deprecated-declarations)
 
 # set CMakeModule path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
 # find packages with modules
+find_package(catkin REQUIRED roscpp std_msgs sensor_msgs)
 find_package(CUDA REQUIRED)
 find_package(PNG REQUIRED)
 find_package(OpenGL REQUIRED QUIET)
@@ -20,6 +24,7 @@ find_package(GLUT REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(DEPTHSENSE)
 find_package(OpenNI2)
+#find_package(freenect2) # Kinect 2
 
 # find packages with pkg-config
 find_package(PkgConfig)
@@ -28,26 +33,126 @@ pkg_check_modules(tinyxml REQUIRED tinyxml)
 pkg_check_modules(matheval REQUIRED libmatheval)
 pkg_check_modules(assimp assimp)
 
-include_directories(
+set(DEPEND_LIBRARIES "")
+set(DEPEND_INCLUDES "")
+
+# add ros depth source
+set(depth_source_src
+  ${depth_source_src}
+  ${PROJECT_SOURCE_DIR}/src/depth_sources/ros_depth_source.h
+  ${PROJECT_SOURCE_DIR}/src/depth_sources/ros_depth_source.cpp
+  )
+
+
+# set conditional sources
+if(OPENNI2_FOUND)
+    include_directories(${OPENNI2_INCLUDE_DIRS})
+    link_directories(${OPENNI2_REDIST_DIR})
+    link_libraries(${OPENNI2_LIBRARY})
+    list(APPEND DEPEND_LIBRARIES ${OPENNI2_LIBRARY})
+    list(APPEND DEPEND_INCLUDES ${OPENNI2_INCLUDE_DIRS})
+    set(depth_source_src
+        ${depth_source_src}
+        ${PROJECT_SOURCE_DIR}/src/depth_sources/openni_depth_source.h
+        ${PROJECT_SOURCE_DIR}/src/depth_sources/openni_depth_source.cpp
+    )
+endif()
+
+if(DEPTHSENSE_FOUND)
+    add_definitions(-DHAS_INTEL)
+    include_directories(${DEPTHSENSE_INCLUDE_DIR})
+    link_libraries(${DEPTHSENSE_LIBRARIES})
+    list(APPEND DEPEND_LIBRARIES ${DEPTHSENSE_LIBRARIES})
+    list(APPEND DEPEND_INCLUDES ${DEPTHSENSE_INCLUDE_DIR})
+    set(depth_source_src
+        ${depth_source_src}
+        ${PROJECT_SOURCE_DIR}/src/depth_sources/depthsense_depth_source.h
+        ${PROJECT_SOURCE_DIR}/src/depth_sources/depthsense_depth_source.cpp
+    )
+endif()
+
+# Added Kinect 2 compatibility
+if (freenect2_FOUND)
+	set(depth_source_src
+        ${depth_source_src}
+        ${PROJECT_SOURCE_DIR}/src/depth_sources/k2_depth_source.h
+	)
+	set(dart_src
+        ${dart_src}
+        ${PROJECT_SOURCE_DIR}/src/util/colorize_kinect2_point_cloud.h
+	)
+	set(gpu_specific_src
+        ${gpu_specific_src}
+        ${PROJECT_SOURCE_DIR}/src/util/colorize_kinect2_point_cloud.cu
+	)
+endif()
+
+if(assimp_FOUND)
+    link_libraries(${assimp_LIBRARIES})
+    include_directories(${assimp_INCLUDE_DIRS})
+    list(APPEND DEPEND_LIBRARIES ${assimp_LIBRARIES})
+    list(APPEND DEPEND_INCLUDES ${assimp_INCLUDE_DIRS})
+    set(dart_src
+        ${dart_src}
+        ${PROJECT_SOURCE_DIR}/src/mesh/assimp_mesh_reader.h
+        ${PROJECT_SOURCE_DIR}/src/mesh/assimp_mesh_reader.cpp
+    )
+    add_definitions(-DASSIMP_BUILD)
+endif()
+
+# catkin
+catkin_package(
+  CATKIN_DEPENDS
+    roscpp std_msgs sensor_msgs
+  INCLUDE_DIRS
+    ${PROJECT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/src
     ${eigen3_INCLUDE_DIRS}
     ${PNG_INCLUDE_DIRS}
     ${OPENGL_INCLUDE_DIR}
     ${GLUT_INCLUDE_DIR}
     ${GLEW_INCLUDE_DIRS}
     ${tinyxml_INCLUDE_DIR}
-)
-link_directories(${tinyxml_LIBRARY_DIRS})
-link_libraries(
+    ${DEPEND_INCLUDES}
+	  ${freenect2_INCLUDE_DIRS}
+  LIBRARIES
+    dart
     ${PNG_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${GLUT_glut_LIBRARY}
     ${GLEW_LIBRARIES}
     ${tinyxml_LIBRARIES}
     ${matheval_LIBRARIES}
+    ${DEPEND_LIBRARIES}
+	  ${freenect2_LIBRARY}
+)
+
+include_directories(
+    ${catkin_INCLUDE_DIRS}
+    ${eigen3_INCLUDE_DIRS}
+    ${PNG_INCLUDE_DIRS}
+    ${OPENGL_INCLUDE_DIR}
+    ${GLUT_INCLUDE_DIR}
+    ${GLEW_INCLUDE_DIRS}
+    ${tinyxml_INCLUDE_DIR}
+	  ${freenect2_INCLUDE_DIRS}
+)
+link_directories(${tinyxml_LIBRARY_DIRS})
+link_libraries(
+    ${catkin_LIBRARIES}
+    ${PNG_LIBRARIES}
+    ${OPENGL_LIBRARIES}
+    ${GLUT_glut_LIBRARY}
+    ${GLEW_LIBRARIES}
+    ${tinyxml_LIBRARIES}
+    ${matheval_LIBRARIES}
+    ${freenect2_LIBRARY}
+    #/home/fleeb/kct_driver/libfreenect2/depends/libusb/lib/libusb-1.0.so
 )
 
 # set dart source
 set(dart_src
+    ${dart_src}
     ${PROJECT_SOURCE_DIR}/src/tracker.h
     ${PROJECT_SOURCE_DIR}/src/tracker.cpp
 
@@ -141,6 +246,7 @@ set(cpu_specific_src
 )
 
 set(gpu_specific_src
+	${gpu_specific_src}
     ${PROJECT_SOURCE_DIR}/src/geometry/distance_transforms.cu
     ${PROJECT_SOURCE_DIR}/src/geometry/plane_fitting.cu
 
@@ -167,51 +273,11 @@ set(point_cloud_srcs
 )
 
 set(depth_source_src
+    ${depth_source_src}
     ${PROJECT_SOURCE_DIR}/src/depth_sources/depth_source.h
     ${PROJECT_SOURCE_DIR}/src/depth_sources/image_depth_source.h
 )
 
-# set conditional sources
-if(OPENNI2_FOUND)
-    include_directories(${OPENNI2_INCLUDE_DIRS})
-    link_directories(${OPENNI2_REDIST_DIR})
-    link_libraries(${OPENNI2_LIBRARY})
-    set(depth_source_src
-        ${depth_source_src}
-        ${PROJECT_SOURCE_DIR}/src/depth_sources/openni_depth_source.h
-        ${PROJECT_SOURCE_DIR}/src/depth_sources/openni_depth_source.cpp
-    )
-endif()
-
-if(DEPTHSENSE_FOUND)
-    add_definitions(-DHAS_INTEL)
-    include_directories(${DEPTHSENSE_INCLUDE_DIR})
-    link_libraries(${DEPTHSENSE_LIBRARIES})
-    set(depth_source_src
-        ${depth_source_src}
-        ${PROJECT_SOURCE_DIR}/src/depth_sources/depthsense_depth_source.h
-        ${PROJECT_SOURCE_DIR}/src/depth_sources/depthsense_depth_source.cpp
-    )
-endif()
-
-if(PMD_FOUND)
-    set(depth_source_src
-        ${depth_source_src}
-        ${PROJECT_SOURCE_DIR}/src/depth_sources/pmd_depth_source.h
-        ${PROJECT_SOURCE_DIR}/src/depth_sources/pmd_depth_source.cpp
-    )
-endif()
-
-if(assimp_FOUND)
-    link_libraries(${assimp_LIBRARIES})
-    include_directories(${assimp_INCLUDE_DIRS})
-    set(dart_src
-        ${dart_src}
-        ${PROJECT_SOURCE_DIR}/src/mesh/assimp_mesh_reader.h
-        ${PROJECT_SOURCE_DIR}/src/mesh/assimp_mesh_reader.cpp
-    )
-    add_definitions(-DASSIMP_BUILD)
-endif()
 
 include_directories(${PROJECT_SOURCE_DIR}/src/)
 
@@ -219,7 +285,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src/)
 set(BUILD_SHARED_LIBS ON)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
-set(CUDA_NVCC_FLAGS "-arch=sm_35" "--use_fast_math"  "-O3" "--ptxas-options=--verbose") # "-fmad=false" "-DTHRUST_DEVICE_BACKEND=THRUST_DEVICE_BACKEND_OMP"
+set(CUDA_NVCC_FLAGS "-arch=sm_52" "--use_fast_math"  "-O3" "--ptxas-options=--verbose") # "-fmad=false" "-DTHRUST_DEVICE_BACKEND=THRUST_DEVICE_BACKEND_OMP"
 
 # add library
 if(CUDA_FOUND)

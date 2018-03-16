@@ -26,7 +26,7 @@ class PangoDepthSource : public DepthSource<DepthType, ColorType> {
 public:
     PangoDepthSource();
     
-    ~PangoDepthSource();
+    ~PangoDepthSource(); 
     
     bool initialize(const std::string & pangoFilename,
                     const float2 focalLength,
