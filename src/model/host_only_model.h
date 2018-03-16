@@ -71,8 +71,8 @@ class HostOnlyModel : public Model
                  std::string jointMax,
                  std::string jointName,
                  std::string mimicJoint,
-                 std::string mimicFactor,
-                 std::string mimicBias);
+                 std::string mimicMultiplier,
+                 std::string mimicOffset);
 
     void computeStructure();
     void voxelize(float resolution,
@@ -89,51 +89,54 @@ class HostOnlyModel : public Model
                           unsigned char blue);
 
     // model queries
-    inline bool hasMimicJoints() const { return mimicJointMap.size() > 0; }
-    inline int getNumMimicJoints() const { return mimicJointMap.size(); }
-    inline bool isMimicJoint(int jointIndex) const
+    bool hasMimicJoints() const { return mimicJointMap.size() > 0; }
+    int getNumMimicJoints() const { return mimicJointMap.size(); }
+    bool isMimicJoint(int jointIndex) const
     {
         return mimicJointMap.find(jointIndex) != mimicJointMap.end();
     }
 
-    inline int getMimicJointSource(int jointIndex) const
+    int getMimicJointSource(int jointIndex) const
     {
         if (!isMimicJoint(jointIndex))
         {
             std::cerr << "Joint " << jointIndex << " is not a mimic joint."
                       << std::endl;
+            exit(1);
         }
 
         return mimicJointMap.find(jointIndex)->second;
     }
-    inline float getMimicFactor(int jointIndex) const
+    float getMimicMultiplier(int jointIndex) const
     {
         if (!isMimicJoint(jointIndex))
         {
             std::cerr << "Joint " << jointIndex << " is not a mimic joint."
                       << std::endl;
+            exit(1);
         }
 
-        return mimicFactorMap.find(jointIndex)->second;
+        return mimicMultiplierMap.find(jointIndex)->second;
     }
 
-    inline float getMimicBias(int jointIndex) const
+    float getMimicOffset(int jointIndex) const
     {
         if (!isMimicJoint(jointIndex))
         {
             std::cerr << "Joint " << jointIndex << " is not a mimic joint."
                       << std::endl;
+            exit(1);
         }
 
-        return mimicBiasMap.find(jointIndex)->second;
+        return mimicOffsetMap.find(jointIndex)->second;
     }
-    inline uint getNumFrames() const { return _nFrames; }
-    inline int getFrameParent(const int frame) const { return _parents[frame]; }
-    inline int getFrameNumChildren(const int frame) const
+    uint getNumFrames() const { return _nFrames; }
+    int getFrameParent(const int frame) const { return _parents[frame]; }
+    int getFrameNumChildren(const int frame) const
     {
         return _children[frame].size();
     }
-    const inline int* getFrameChildren(const int frame) const
+    const int* getFrameChildren(const int frame) const
     {
         return _children[frame].data();
     }
@@ -146,26 +149,26 @@ class HostOnlyModel : public Model
     }
 
     const int* getDependencies() const { return _dependencies.data(); }
-    inline int getDependency(const int frame, const int joint) const
+    int getDependency(const int frame, const int joint) const
     {
         return _dependencies[frame * getNumJoints() + joint];
     }
 
-    const inline SE3& getTransformFrameToModel(const int frame) const
+    const SE3& getTransformFrameToModel(const int frame) const
     {
         return _T_mf[frame];
     }
-    const inline SE3& getTransformModelToFrame(const int frame) const
+    const SE3& getTransformModelToFrame(const int frame) const
     {
         return _T_fm[frame];
     }
-    const inline SE3* getTransformsFrameToModel() const { return _T_mf.data(); }
-    const inline SE3* getTransformsModelToFrame() const { return _T_fm.data(); }
-    inline int getFrameNumGeoms(const int frame) const
+    const SE3* getTransformsFrameToModel() const { return _T_mf.data(); }
+    const SE3* getTransformsModelToFrame() const { return _T_fm.data(); }
+    int getFrameNumGeoms(const int frame) const
     {
         return _frameGeoms[frame].size();
     }
-    const inline int* getFrameGeoms(const int frame) const
+    const int* getFrameGeoms(const int frame) const
     {
         return _frameGeoms[frame].data();
     }
@@ -177,7 +180,7 @@ class HostOnlyModel : public Model
                 if (getFrameGeoms(i)[j] == geom_number) return i;
         return -1;
     }
-    inline uchar3 getGeometryColor(const int geomNumber) const
+    uchar3 getGeometryColor(const int geomNumber) const
     {
         return _geomColors[geomNumber];
     }
@@ -188,45 +191,35 @@ class HostOnlyModel : public Model
     }
 
     // joint queries
-    inline uint getNumJoints() const { return _jointNames.size(); }
-    inline int getJointFrame(const int joint) const { return joint + 1; }
-    inline JointType getJointType(const int joint) const
-    {
-        return _jointTypes[joint];
-    }
-    inline float3 getJointAxis(const int joint) const { return _axes[joint]; }
-    inline float3& getJointPosition(const int joint)
-    {
-        return _positions[joint];
-    }
-    inline float3& getJointOrientation(const int joint)
+    uint getNumJoints() const { return _jointNames.size(); }
+    int getJointFrame(const int joint) const { return joint + 1; }
+    JointType getJointType(const int joint) const { return _jointTypes[joint]; }
+    float3 getJointAxis(const int joint) const { return _axes[joint]; }
+    float3& getJointPosition(const int joint) { return _positions[joint]; }
+    float3& getJointOrientation(const int joint)
     {
         return _orientations[joint];
     }
-    inline const float3& getJointPosition(const int joint) const
+    const float3& getJointPosition(const int joint) const
     {
         return _positions[joint];
     }
-    inline const float3& getJointOrientation(const int joint) const
+    const float3& getJointOrientation(const int joint) const
     {
         return _orientations[joint];
     }
 
-    inline uint getNumSdfs() const { return _sdfs.size(); }
+    uint getNumSdfs() const { return _sdfs.size(); }
     const Grid3D<float>& getSdf(const int sdfNum) const
     {
         return _sdfs[sdfNum];
     }
     const Grid3D<float>* getSdfs() const { return _sdfs.data(); }
-    inline uint getSdfFrameNumber(const int sdfNum) const
+    uint getSdfFrameNumber(const int sdfNum) const
     {
         return _sdfFrames[sdfNum];
     }
-    inline uchar3 getSdfColor(const int sdfNum) const
-    {
-        return _sdfColors[sdfNum];
-    }
-
+    uchar3 getSdfColor(const int sdfNum) const { return _sdfColors[sdfNum]; }
     void setVoxelGrid(Grid3D<float>& grid, const int link);
 
     // set parameters of DH model
@@ -265,16 +258,16 @@ class HostOnlyModel : public Model
         return 0.0;
     }
 
-    inline void setSdfColor(const int sdfNum, const uchar3 color)
+    void setSdfColor(const int sdfNum, const uchar3 color)
     {
         _sdfColors[sdfNum] = color;
     }
-    inline void setGeometryColor(const int geomNum, const uchar3 color)
+    void setGeometryColor(const int geomNum, const uchar3 color)
     {
         _geomColors[geomNum] = color;
     }
 
-    inline const SE3 getTransformJointAxisToParent(const int joint) const
+    const SE3 getTransformJointAxisToParent(const int joint) const
     {
         return _T_pf[joint];
     }
@@ -310,8 +303,8 @@ class HostOnlyModel : public Model
     std::map<std::string, int> jointNameIndexMap;
     std::vector<std::string> mimicJoints;
     std::map<int, int> mimicJointMap;
-    std::map<int, float> mimicFactorMap;
-    std::map<int, float> mimicBiasMap;
+    std::map<int, float> mimicMultiplierMap;
+    std::map<int, float> mimicOffsetMap;
 
     void voxelizeFrame(Grid3D<float>& vg,
                        const int frame,

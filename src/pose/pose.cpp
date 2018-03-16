@@ -154,14 +154,12 @@ LinearPoseReduction* LinearPoseReduction::CreateFromModel(
     std::vector<float> jointMaxs;
     std::vector<std::string> jointNames;
 
-    auto reducedIndex = [&](int jointIndex) {
+    auto determineReducedIndex = [&](int jointIndex) {
         int index = 0;
         if (model->isMimicJoint(jointIndex))
         {
             // Get reference index
             int sourceJointIndex = model->getMimicJointSource(jointIndex);
-            std::cout << ">>>>>>> " << jointIndex << " is mimicking "
-                      << sourceJointIndex << std::endl;
             for (int i = 0; i < sourceJointIndex; ++i)
             {
                 if (!model->isMimicJoint(i))
@@ -193,17 +191,18 @@ LinearPoseReduction* LinearPoseReduction::CreateFromModel(
         float bias = 0.f;
         if (model->isMimicJoint(f))
         {
-            std::cout << "Mimic found at " << f << std::endl;
-            factor = model->getMimicFactor(f);
-            bias = model->getMimicBias(f);
+            factor = model->getMimicMultiplier(f);
+            bias = model->getMimicOffset(f);
         }
-        int rIndx = reducedIndex(f);
-        if (rIndx > fullDimensions)
+        int reducedIndex = determineReducedIndex(f);
+        if (reducedIndex > fullDimensions)
         {
-            std::cout << "something is wrong ... " << std::endl;
+            std::cout << "Reduced joint index is out bounds (Larger than the "
+                         "total state dimension) ... "
+                      << std::endl;
             exit(1);
         }
-        A[f * reducedDimensions + rIndx] = factor;
+        A[f * reducedDimensions + reducedIndex] = factor;
         b[f] = bias;
 
         if (!model->isMimicJoint(f))

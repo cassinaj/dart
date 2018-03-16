@@ -71,8 +71,8 @@ int HostOnlyModel::addFrame(int parent,
                             std::string jointMax,
                             std::string jointName,
                             std::string mimicJoint,
-                            std::string mimicFactor,
-                            std::string mimicBias)
+                            std::string mimicMultiplier,
+                            std::string mimicOffset)
 {
     std::vector<std::string> frameExpressions(11);
     frameExpressions[0] = posX;
@@ -152,8 +152,8 @@ int HostOnlyModel::addFrame(int parent,
     mimicJoints.push_back(mimicJoint);
     if (!mimicJoint.empty())
     {
-        mimicFactorMap[getNumJoints() - 1] = evaluateExpression(mimicFactor);
-        mimicBiasMap[getNumJoints() - 1] = evaluateExpression(mimicBias);
+        mimicMultiplierMap[getNumJoints() - 1] = evaluateExpression(mimicMultiplier);
+        mimicOffsetMap[getNumJoints() - 1] = evaluateExpression(mimicOffset);
     }
 
     return _nFrames - 1;
