@@ -3,7 +3,6 @@
 #include <GL/freeglut.h>
 #include <GL/glew.h>
 
-#include <matheval.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <cstdarg>
@@ -35,25 +34,6 @@ HostOnlyModel::HostOnlyModel() : Model(6)
 HostOnlyModel::~HostOnlyModel() {}
 float HostOnlyModel::evaluateExpression(const std::string &expression)
 {
-    // char *cStr = new char[expression.size() + 1];
-    // memcpy(cStr, expression.c_str(), expression.size());
-    // cStr[expression.size()] = 0;
-    // void *f = evaluator_create(cStr);
-    // assert(f);
-    // char **varNames;
-    // int varCount;
-    // evaluator_get_variables(f, &varNames, &varCount);
-    // double varValues[varCount];
-    // for (int i = 0; i < varCount; ++i)
-    // {
-    //     varValues[i] = getSizeParam(std::string(varNames[i]));
-    // }
-    // float val = evaluator_evaluate(f, varCount, varNames, varValues);
-
-    // delete[] cStr;
-    // evaluator_destroy(f);
-
-    // return val;
     return std::stof(expression);
 }
 
@@ -153,7 +133,8 @@ int HostOnlyModel::addFrame(int parent,
     mimicJoints.push_back(mimicJoint);
     if (!mimicJoint.empty())
     {
-        mimicMultiplierMap[getNumJoints() - 1] = evaluateExpression(mimicMultiplier);
+        mimicMultiplierMap[getNumJoints() - 1] =
+            evaluateExpression(mimicMultiplier);
         mimicOffsetMap[getNumJoints() - 1] = evaluateExpression(mimicOffset);
     }
 

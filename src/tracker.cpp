@@ -160,13 +160,13 @@ bool Tracker::addModel(const std::string &filename,
                                           jointMins.data(),
                                           jointMaxs.data(),
                                           jointNames.data());
+
+        // poseReduction = LinearPoseReduction::CreateFromModel(&model);
+
         _ownedPoseReductions.push_back(poseReduction);
     }
-    auto test_linear_reduction = LinearPoseReduction::CreateFromModel(&model);
-    test_linear_reduction->print();
-    _estimatedPoses.push_back(Pose(test_linear_reduction));
 
-    // _estimatedPoses.push_back(Pose(poseReduction));
+    _estimatedPoses.push_back(Pose(poseReduction));
 
     _filenames.push_back(filename);
 

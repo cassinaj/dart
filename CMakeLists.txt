@@ -30,7 +30,6 @@ find_package(OpenNI2)
 find_package(PkgConfig)
 pkg_check_modules(eigen3 REQUIRED eigen3)
 pkg_check_modules(tinyxml REQUIRED tinyxml)
-pkg_check_modules(matheval REQUIRED libmatheval)
 pkg_check_modules(assimp assimp)
 
 set(DEPEND_LIBRARIES "")
@@ -122,7 +121,6 @@ catkin_package(
     ${GLUT_glut_LIBRARY}
     ${GLEW_LIBRARIES}
     ${tinyxml_LIBRARIES}
-    ${matheval_LIBRARIES}
     ${DEPEND_LIBRARIES}
 	  ${freenect2_LIBRARY}
 )
@@ -145,7 +143,6 @@ link_libraries(
     ${GLUT_glut_LIBRARY}
     ${GLEW_LIBRARIES}
     ${tinyxml_LIBRARIES}
-    ${matheval_LIBRARIES}
     ${freenect2_LIBRARY}
     #/home/fleeb/kct_driver/libfreenect2/depends/libusb/lib/libusb-1.0.so
 )
